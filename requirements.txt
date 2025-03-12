@@ -2,3 +2,5 @@ flask
 speechbrain
 torchaudio
 numpy
+soundfile
+sox
