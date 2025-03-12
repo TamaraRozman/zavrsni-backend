@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from speechbrain.pretrained import SepformerSeparation as separator
+from speechbrain.inference import SepformerSeparation as separator
 import torchaudio
 import io
 
