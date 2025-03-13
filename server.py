@@ -1,37 +1,37 @@
-from flask import Flask
-from flask_socketio import SocketIO
-import torchaudio
+import asyncio
+import websockets
+import base64
 import io
 import torch
-from speechbrain.inference import SepformerSeparation as separator
-from speechbrain.inference import EncoderDecoderASR
+from speechbrain.inference import WhisperASR
 
-app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")  # WebSockets for real-time streaming
+# Load Whisper ASR model (supports Croatian)
+asr_model = WhisperASR.from_hparams(source="speechbrain/whisper-large-v2", savedir="whisper_model")
 
-# Load models
-separation_model = separator.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir="tmpdir")
-asr_model = EncoderDecoderASR.from_hparams(source="speechbrain/asr-wav2vec2-commonvoice-en", savedir="asr_model")
+async def process_audio(websocket, path):
+    print("Client connected")
+    
+    audio_chunks = bytearray()
+    
+    async for message in websocket:
+        audio_data = base64.b64decode(message)  # Decode Base64
+        audio_chunks.extend(audio_data)
 
-@socketio.on('audio_chunk')
-def handle_audio_chunk(data):
-    """Handles incoming audio chunks from Flutter"""
+        if len(audio_chunks) > 16000 * 5:  # Process every 5 seconds
+            print("Processing Croatian audio...")
+            
+            # Convert to tensor
+            audio_tensor = torch.tensor(list(audio_chunks), dtype=torch.float32).unsqueeze(0)
+            
+            # Transcribe in Croatian
+            transcript = asr_model.transcribe_batch(audio_tensor, language="hr")
+            
+            await websocket.send(transcript)  # Send transcript back to Flutter
+            audio_chunks.clear()
 
-    # Convert bytes to tensor
-    audio_data = io.BytesIO(data)
-    waveform, sample_rate = torchaudio.load(audio_data)
+async def main():
+    async with websockets.serve(process_audio, "0.0.0.0", 8765):  
+        await asyncio.Future()  # Run server forever
 
-    # Separate speakers
-    separated_waveforms = separation_model.separate_batch(waveform)
-
-    transcripts = {}
-    for i, speaker_waveform in enumerate(separated_waveforms):
-        # Transcribe the separated voice
-        transcript = asr_model.transcribe_batch(speaker_waveform.unsqueeze(0))
-        transcripts[f"speaker_{i}"] = transcript
-
-    # Send transcriptions back to Flutter
-    socketio.emit('transcription', transcripts)
-
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    asyncio.run(main())
