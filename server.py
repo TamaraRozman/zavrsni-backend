@@ -1,5 +1,10 @@
 import asyncio
-import websockets
+try:
+    import websockets
+    print("Websockets is installed!")
+except ImportError:
+    print("Websockets is NOT installed.")
+
 import base64
 import io
 import torch
