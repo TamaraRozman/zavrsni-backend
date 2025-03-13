@@ -1,32 +1,37 @@
-from flask import Flask, request, jsonify
-from speechbrain.inference import SepformerSeparation as separator
+from flask import Flask
+from flask_socketio import SocketIO
 import torchaudio
 import io
+import torch
+from speechbrain.inference import SepformerSeparation as separator
+from speechbrain.inference import EncoderDecoderASR
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")  # WebSockets for real-time streaming
 
-# Load SpeechBrain model
-model = separator.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir="tmpdir")
+# Load models
+separation_model = separator.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir="tmpdir")
+asr_model = EncoderDecoderASR.from_hparams(source="speechbrain/asr-wav2vec2-commonvoice-en", savedir="asr_model")
 
-@app.route('/separate', methods=['POST'])
-def separate_audio():
-    file = request.files['audio']
-    audio_bytes = file.read()
+@socketio.on('audio_chunk')
+def handle_audio_chunk(data):
+    """Handles incoming audio chunks from Flutter"""
 
     # Convert bytes to tensor
-    waveform, sample_rate = torchaudio.load(io.BytesIO(audio_bytes))
+    audio_data = io.BytesIO(data)
+    waveform, sample_rate = torchaudio.load(audio_data)
 
-    # Separate voices
-    separated = model.separate_batch(waveform)
+    # Separate speakers
+    separated_waveforms = separation_model.separate_batch(waveform)
 
-    # Save each speaker's audio
-    speaker_files = {}
-    for i, speaker_audio in enumerate(separated):
-        speaker_path = f"speaker_{i}.wav"
-        torchaudio.save(speaker_path, speaker_audio.unsqueeze(0), 8000)
-        speaker_files[f"Speaker {i}"] = speaker_path
+    transcripts = {}
+    for i, speaker_waveform in enumerate(separated_waveforms):
+        # Transcribe the separated voice
+        transcript = asr_model.transcribe_batch(speaker_waveform.unsqueeze(0))
+        transcripts[f"speaker_{i}"] = transcript
 
-    return jsonify({"speakers": list(speaker_files.values())})
+    # Send transcriptions back to Flutter
+    socketio.emit('transcription', transcripts)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000)
