@@ -1,7 +1,3 @@
-flask
-speechbrain
-torchaudio
-numpy
-soundfile
-sox
 websockets
+speechbrain
+torch
