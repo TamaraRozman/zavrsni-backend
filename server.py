@@ -1,8 +1,8 @@
 from flask import Flask
 from flask_socketio import SocketIO, emit
 import torchaudio
-from speechbrain.pretrained import SepformerSeparation
-from faster_whisper import Whisper
+from faster_whisper import WhisperModel
+from speechbrain.inference import SepformerSeparation
 import tempfile
 import os
 
