@@ -1,42 +1,26 @@
-import asyncio
-try:
-    import websockets
-    print("Websockets is installed!")
-except ImportError:
-    print("Websockets is NOT installed.")
-
-import base64
-import io
+from flask import Flask, request, jsonify
 import torch
-from speechbrain.inference import WhisperASR
+from speechbrain.pretrained import Tacotron2, HIFIGAN
 
-# Load Whisper ASR model (supports Croatian)
-asr_model = WhisperASR.from_hparams(source="speechbrain/whisper-large-v2", savedir="whisper_model")
+app = Flask(__name__)
 
-async def process_audio(websocket, path):
-    print("Client connected")
+# Load the SpeechBrain separator model
+separator = torch.hub.load("speechbrain/speechbrain", "sepformer-wsj02mix")
+
+@app.route("/separate", methods=["POST"])
+def separate():
+    audio_file = request.files["file"]
+    audio_path = "uploaded_audio.wav"
+    audio_file.save(audio_path)
     
-    audio_chunks = bytearray()
+    # Use SpeechBrain to separate voices in the audio
+    separated_audio = separator.separate_file(audio_path)
+
+    # Save the separated audio to send back to Flutter
+    output_path = "separated_audio.wav"
+    separated_audio.save(output_path)
     
-    async for message in websocket:
-        audio_data = base64.b64decode(message)  # Decode Base64
-        audio_chunks.extend(audio_data)
-
-        if len(audio_chunks) > 16000 * 5:  # Process every 5 seconds
-            print("Processing Croatian audio...")
-            
-            # Convert to tensor
-            audio_tensor = torch.tensor(list(audio_chunks), dtype=torch.float32).unsqueeze(0)
-            
-            # Transcribe in Croatian
-            transcript = asr_model.transcribe_batch(audio_tensor, language="hr")
-            
-            await websocket.send(transcript)  # Send transcript back to Flutter
-            audio_chunks.clear()
-
-async def main():
-    async with websockets.serve(process_audio, "0.0.0.0", 8765):  
-        await asyncio.Future()  # Run server forever
+    return jsonify({"message": "Separation successful", "audio_url": output_path})
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    app.run(debug=True)
