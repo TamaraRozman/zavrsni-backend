@@ -1,3 +1,9 @@
-websockets
+flask
+flask-socketio
 speechbrain
+faster-whisper
 torch
+torchaudio
+numpy
+eventlet  # Required for WebSockets with Flask
+tempfile
