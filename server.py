@@ -1,48 +1,34 @@
-from flask import Flask
-from flask_socketio import SocketIO, emit
-import torchaudio
-from faster_whisper import WhisperModel
-from speechbrain.inference import SepformerSeparation
-import tempfile
-import os
+import whisper
 
-# Initialize Flask and WebSockets
-app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Load Whisper model (choose 'base', 'small', 'medium', or 'large' for better accuracy)
+whisper_model = whisper.load_model("small")
 
-# Load models
-separation_model = SepformerSeparation.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir="tmp")
-whisper_model = Whisper("medium")
+@app.route('/process_audio', methods=['POST'])
+def process_audio():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    file = request.files['file']
+    audio_path = "temp_audio.wav"
+    file.save(audio_path)
 
-# Process received audio
-def process_audio(audio_path):
-    waveform, _ = torchaudio.load(audio_path)
-    separated = separation_model.separate_batch(waveform)
+    # Separate speakers
+    est_sources = sep_model.separate_file(path=audio_path)
+    num_speakers = est_sources.shape[2]
+    sample_rate = 8000
 
     results = []
-    for i, speaker_audio in enumerate(separated):
-        temp_file = f"temp_speaker_{i}.wav"
-        torchaudio.save(temp_file, speaker_audio, 16000)
+    
+    for i in range(num_speakers):
+        speaker_audio_path = f"speaker_{i+1}.wav"
+        torchaudio.save(speaker_audio_path, est_sources[:, :, i].detach().cpu(), sample_rate)
 
-        segments, _ = whisper_model.transcribe(temp_file)
-        text = " ".join([seg.text for seg in segments])
-        results.append({"speaker": f"Speaker {i+1}", "text": text})
-        
-        os.remove(temp_file)
+        # Transcribe using Whisper (Croatian language supported)
+        transcription = whisper_model.transcribe(speaker_audio_path, language="hr")["text"]
 
-    return results
+        results.append({
+            "speaker": f"Speaker {i+1}",
+            "transcription": transcription
+        })
 
-# WebSocket connection
-@socketio.on("audio_chunk")
-def handle_audio_chunk(data):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-        temp_audio.write(data)
-        temp_audio.close()
-
-        transcriptions = process_audio(temp_audio.name)
-        os.remove(temp_audio.name)
-
-        emit("transcription", transcriptions)
-
-if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000)
+    return jsonify({"speakers": results})
