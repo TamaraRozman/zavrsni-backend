@@ -1,8 +1,6 @@
 flask
-flask-socketio
-speechbrain
-faster-whisper
+flask_cors
 torch
 torchaudio
-numpy
-eventlet  # Required for WebSockets with Flask
+speechbrain
+openai-whisper
