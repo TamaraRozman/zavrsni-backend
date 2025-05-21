@@ -4,3 +4,4 @@ speechbrain
 soundfile
 fastapi
 uvicorn
+python-multipart
