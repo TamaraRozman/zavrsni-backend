@@ -1,6 +1,4 @@
-flask
-flask_cors
-torch
-torchaudio
+fastapi
+uvicorn
 speechbrain
-openai-whisper
+torchaudio
