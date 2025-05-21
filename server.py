@@ -1,34 +1,40 @@
-import whisper
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import FileResponse
+import os
+import torchaudio
+from speechbrain.inference.separation import SepformerSeparation as separator
+import uuid
 
-# Load Whisper model (choose 'base', 'small', 'medium', or 'large' for better accuracy)
-whisper_model = whisper.load_model("small")
+app = FastAPI()
+model = separator.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir='pretrained_models/sepformer-wsj02mix')
 
-@app.route('/process_audio', methods=['POST'])
-def process_audio():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-    
-    file = request.files['file']
-    audio_path = "temp_audio.wav"
-    file.save(audio_path)
+@app.post("/separate")
+async def separate_audio(file: UploadFile = File(...)):
+    # Save input
+    input_path = f"temp_{uuid.uuid4()}.wav"
+    with open(input_path, "wb") as f:
+        f.write(await file.read())
 
-    # Separate speakers
-    est_sources = sep_model.separate_file(path=audio_path)
-    num_speakers = est_sources.shape[2]
-    sample_rate = 8000
+    # Run separation
+    est_sources = model.separate_file(path=input_path)
+    os.makedirs("output", exist_ok=True)
+    source1_path = f"output/source1_{uuid.uuid4()}.wav"
+    source2_path = f"output/source2_{uuid.uuid4()}.wav"
+    torchaudio.save(source1_path, est_sources[:, :, 0].detach().cpu(), 8000)
+    torchaudio.save(source2_path, est_sources[:, :, 1].detach().cpu(), 8000)
 
-    results = []
-    
-    for i in range(num_speakers):
-        speaker_audio_path = f"speaker_{i+1}.wav"
-        torchaudio.save(speaker_audio_path, est_sources[:, :, i].detach().cpu(), sample_rate)
+    # Clean up
+    os.remove(input_path)
 
-        # Transcribe using Whisper (Croatian language supported)
-        transcription = whisper_model.transcribe(speaker_audio_path, language="hr")["text"]
+    # Return paths (could also return as base64)
+    return {
+        "source1": source1_path,
+        "source2": source2_path
+    }
 
-        results.append({
-            "speaker": f"Speaker {i+1}",
-            "transcription": transcription
-        })
-
-    return jsonify({"speakers": results})
+@app.get("/download/{filename}")
+def download_file(filename: str):
+    file_path = os.path.join("output", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type='audio/wav', filename=filename)
+    return {"error": "File not found"}
