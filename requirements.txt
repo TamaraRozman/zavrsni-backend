@@ -1,4 +1,6 @@
+torch
+torchaudio
+speechbrain
+soundfile
 fastapi
 uvicorn
-speechbrain
-torchaudio
