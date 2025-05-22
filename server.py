@@ -18,19 +18,22 @@ async def separate_audio(file: UploadFile = File(...)):
     # Run separation
     est_sources = model.separate_file(path=input_path)
     os.makedirs("output", exist_ok=True)
-    source1_path = f"output/source1_{uuid.uuid4()}.wav"
-    source2_path = f"output/source2_{uuid.uuid4()}.wav"
-    torchaudio.save(source1_path, est_sources[:, :, 0].detach().cpu(), 8000)
-    torchaudio.save(source2_path, est_sources[:, :, 1].detach().cpu(), 8000)
 
-    # Clean up
+    # Save all separated sources dynamically
+    saved_files = []
+    num_sources = est_sources.shape[2]
+
+    for i in range(num_sources):
+        filename = f"source{i+1}_{uuid.uuid4()}.wav"
+        filepath = os.path.join("output", filename)
+        torchaudio.save(filepath, est_sources[:, :, i].detach().cpu(), 8000)
+        saved_files.append(filename)
+
+    # Clean up input
     os.remove(input_path)
 
-    # Return paths (could also return as base64)
-    return {
-        "source1": source1_path,
-        "source2": source2_path
-    }
+    # Return paths of all saved files
+    return {"sources": saved_files}
 
 @app.get("/download/{filename}")
 def download_file(filename: str):
