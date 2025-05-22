@@ -8,6 +8,7 @@ import uuid
 app = FastAPI()
 model = separator.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir='pretrained_models/sepformer-wsj02mix')
 
+BASE_URL = "https://web-production-80392.up.railway.app"
 @app.post("/separate")
 async def separate_audio(file: UploadFile = File(...)):
     # Save input
@@ -27,7 +28,7 @@ async def separate_audio(file: UploadFile = File(...)):
         filename = f"source{i+1}_{uuid.uuid4()}.wav"
         filepath = os.path.join("output", filename)
         torchaudio.save(filepath, est_sources[:, :, i].detach().cpu(), 8000)
-        saved_files.append(filename)
+        saved_files.append(f"{BASE_URL}/download/{filename}")
 
     # Clean up input
     os.remove(input_path)
