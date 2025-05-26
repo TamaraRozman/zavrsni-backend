@@ -9,7 +9,7 @@ import uuid
 app = FastAPI()
 
 sep_model = separator.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir='pretrained_models/sepformer-wsj02mix')
-asr_model = whisper.load_model("tiny")
+asr_model = whisper.load_model("small")
 
 @app.post("/separate")
 async def separate_audio(file: UploadFile = File(...)):
