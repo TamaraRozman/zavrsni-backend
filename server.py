@@ -9,7 +9,7 @@ import uuid
 app = FastAPI()
 
 sep_model = separator.from_hparams(source="speechbrain/sepformer-wsj02mix", savedir='pretrained_models/sepformer-wsj02mix')
-asr_model = whisper.load_model("base")
+asr_model = whisper.load_model("tiny")
 
 @app.post("/separate")
 async def separate_audio(file: UploadFile = File(...)):
@@ -28,12 +28,12 @@ async def separate_audio(file: UploadFile = File(...)):
         filepath = os.path.join("output", filename)
         torchaudio.save(filepath, est_sources[:, :, i].detach().cpu(), 8000)
 
-        transcription = asr_model.transcribe(filepath)["text"]
+        transcription = asr_model.transcribe(filepath, language="hr")["text"]
 
         results.append({
             "speaker": f"Govornik {i + 1}",
             "transcript": transcription
         })
 
-    os.remove(input_path)
+    print(results)
     return {"results": results}
