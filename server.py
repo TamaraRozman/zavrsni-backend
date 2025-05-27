@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, JSONResponse
 from fastapi.responses import FileResponse
 import os
 import torchaudio
@@ -43,4 +43,4 @@ async def separate_audio(file: UploadFile = File(...)):
     print(results)
     os.remove(input_path)
 
-    return(json.dumps(results, indent=4)) 
+    return JSONResponse(content={"sources": results})
