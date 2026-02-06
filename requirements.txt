@@ -1,5 +1,7 @@
-torch==2.1.2
-torchaudio==2.1.2
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch
+torchaudio
 speechbrain
 soundfile
 fastapi
