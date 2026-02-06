@@ -1,8 +1,8 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-torch
-torchaudio
-speechbrain
+torch==2.1.2
+torchaudio==2.1.2
+speechbrain==0.5.16
 soundfile
 fastapi
 uvicorn
