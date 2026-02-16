@@ -19,7 +19,7 @@ pipeline = Pipeline.from_pretrained(
 )
 
 print("Loading Whisper...")
-whisper = WhisperModel("medium", compute_type="int8")
+whisper = WhisperModel("small", compute_type="int8")
 
 print("Models loaded.")
 
