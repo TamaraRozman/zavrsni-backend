@@ -3,8 +3,10 @@
 torch==2.1.2
 torchaudio==2.1.2
 speechbrain==0.5.16
-soundfile
+faster-whisper
 fastapi
 uvicorn
 python-multipart
-faster-whisper
+soundfile
+numpy<2
+requests
