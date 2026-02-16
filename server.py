@@ -1,69 +1,60 @@
-from fastapi import FastAPI, UploadFile, File
 import os
-import torchaudio
-from speechbrain.inference.separation import SepformerSeparation
-from faster_whisper import WhisperModel
 import uuid
+from fastapi import FastAPI, UploadFile, File
+from faster_whisper import WhisperModel
+from pyannote.audio import Pipeline
+
+LANGUAGE = "hr"
+TEMP_DIR = "temp"
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+ACCESS_TOKEN = os.getenv("HF_TOKEN")
 
 app = FastAPI()
 
-# Load models once at startup
-sep_model = SepformerSeparation.from_hparams(
-    source="speechbrain/sepformer-wsj02mix",
-    savedir="pretrained_models/sepformer-wsj02mix"
+print("Loading diarization model...")
+pipeline = Pipeline.from_pretrained(
+    "pyannote/speaker-diarization-3.1",
+    use_auth_token=ACCESS_TOKEN
 )
 
-# Use small if CPU is slow
-model = WhisperModel("medium", compute_type="int8")
+print("Loading Whisper...")
+whisper = WhisperModel("medium", compute_type="int8")
 
-@app.post("/separate")
-async def separate_audio(file: UploadFile = File(...)):
-    
-    # Save uploaded file
-    input_path = f"temp_{uuid.uuid4()}.wav"
+print("Models loaded.")
+
+
+@app.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
+    file_id = str(uuid.uuid4())
+    input_path = os.path.join(TEMP_DIR, f"{file_id}.wav")
+
     with open(input_path, "wb") as f:
         f.write(await file.read())
 
-    # Separate sources
-    est_sources = sep_model.separate_file(path=input_path)
+    diarization = pipeline(input_path)
+    segments, _ = whisper.transcribe(input_path, language=LANGUAGE)
 
-    # Remove batch dimension
-    est_sources = est_sources.squeeze(0)  # shape: [time, sources]
+    labeled = []
 
-    os.makedirs("output", exist_ok=True)
+    for seg in segments:
+        t0, t1 = seg.start, seg.end
+        max_overlap = 0.0
+        best_speaker = "Unknown"
 
-    results = []
-    num_sources = est_sources.shape[1]
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
+            overlap_start = max(t0, turn.start)
+            overlap_end = min(t1, turn.end)
+            overlap = max(0.0, overlap_end - overlap_start)
 
-    for i in range(num_sources):
-        filename = f"source{i+1}_{uuid.uuid4()}.wav"
-        filepath = os.path.join("output", filename)
+            if overlap > max_overlap:
+                max_overlap = overlap
+                best_speaker = speaker
 
-        # Extract single speaker
-        source_audio = est_sources[:, i].detach().cpu().unsqueeze(0)
-
-        # Save at original 8000 Hz (NO resampling)
-        torchaudio.save(
-            filepath,
-            source_audio,
-            8000,
-            encoding="PCM_S",
-            bits_per_sample=16
-        )
-
-        # Transcribe (faster-whisper handles resampling internally)
-        transcription = ""
-        segments, _ = model.transcribe(filepath, language="hr")
-
-        for segment in segments:
-            transcription += segment.text
-
-        results.append({
-            "speaker": f"Govornik {i+1}",
-            "transcript": transcription.strip()
+        labeled.append({
+            "speaker": best_speaker.replace("SPEAKER_", "Govornik "),
+            "text": seg.text.strip()
         })
 
-    # Cleanup input file
     os.remove(input_path)
-
-    return results
+    return labeled
