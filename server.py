@@ -11,13 +11,13 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 app = FastAPI()
 
 # === Load models ===
-print("⏳ Loading Pyannote diarization model...")
+print("Loading Pyannote diarization model...")
 # token removed — HF token must be in environment variable HUGGINGFACE_TOKEN
 pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
 
-print("⏳ Loading Whisper model...")
+print("Loading Whisper model...")
 whisper = WhisperModel("small", compute_type="int8")
-print("✅ Models loaded.")
+print("Models loaded.")
 
 
 @app.post("/transcribe")
@@ -54,7 +54,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
         labeled.append({
             "speaker": best_speaker.replace("SPEAKER_", "Govornik "),
-            "text": seg.text.strip()
+            "transcript": seg.text.strip()
         })
 
     # Remove temporary file
