@@ -23,10 +23,10 @@ app = FastAPI()
 # -------- LOAD MODELS (ONCE) --------
 print("Loading diarization model (fast CPU version)...")
 pipeline = Pipeline.from_pretrained(
-    "pyannote/speaker-diarization@2.1",
+    "pyannote/speaker-diarization",
     use_auth_token=ACCESS_TOKEN
 )
-pipeline.to(torch.device("cpu"))
+pipeline.to("cpu")
 
 print("Loading Whisper (CPU optimized)...")
 whisper = WhisperModel(
