@@ -33,7 +33,7 @@ def load_models():
         "pyannote/speaker-diarization-3.1",
         use_auth_token=HF_TOKEN
     )
-    pipeline.to("cpu")
+    pipeline.to(torch.device("cpu"))
 
     print("Loading Whisper...")
     whisper = WhisperModel(
@@ -61,7 +61,7 @@ def preprocess(input_path, output_path):
 
 
 # ===== ENDPOINT =====
-@app.post("/transcribe")
+@app.post("/separate")
 async def transcribe(file: UploadFile = File(...)):
     file_id = str(uuid.uuid4())
 
