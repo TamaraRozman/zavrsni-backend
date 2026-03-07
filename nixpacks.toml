@@ -1,4 +1,6 @@
-providers = ["...", "python"]
-
 [phases.setup]
-    nixPkgs = ['...', 'ffmpeg']
+nixPkgs = ["python311", "ffmpeg"]
+
+[variables]
+# This ensures ffmpeg is in the PATH for shutil.which()
+PATH = "$PATH:/usr/bin"
